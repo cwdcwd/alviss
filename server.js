@@ -14,7 +14,7 @@ const HOST = '0.0.0.0';
 // App
 const app = express();
 app.get('/', (req, res) => {
-	let name = 'world';
+	let name = req.query.name || 'world';
 	res.send(`Hello ${name} from Node.js!\n`);
 });
 
