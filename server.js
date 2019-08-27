@@ -63,7 +63,6 @@ app.get('/slackAuthorize', (req, res) => {
 
 app.get('/slackVerify', (req, res) => {
 	const params = SLACK_PARAMS_ACCESS;
-
 	if (req.query.code) {
 		params.code = req.query.code; // CWD-- should really implement this
 	}
@@ -80,13 +79,20 @@ app.get('/slackVerify', (req, res) => {
 		const accessResp=JSON.parse(resp);
 		console.log(accessResp);
 		// CWD-- TODO: store token response for the user
+		if (_.get(accessResp, 'ok', false) === true) {
+			res.status(200);
+			res.render('postInstall', { title: 'Installation Complete', team_name: accessResp.team_name });
+		} else  {
+			res.status(500);
+			res.render('error', { errMsg: accessResp.error });
+		}
 
-		res.status(200);
-		res.render('postInstall', { title: 'Installation Complete', team_name: accessResp.team_name });
+		return;
 	})).catch((err) => {
 		console.log(err);
 		res.status(500);
-		res.json(err);
+		res.render('error', { errMsg: err.message });
+		return;
 	})
 	
 });
