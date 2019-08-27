@@ -10,6 +10,7 @@ const qs = require('qs');
 const express = require('express');
 const vader = require('vader-sentiment');
 const rp = require('request-promise-native');
+const exphbs = require('express-handlebars');
 
 
 // Constants
@@ -37,7 +38,8 @@ const SLACK_ACCESS_URL = 'https://slack.com/api/oauth.access';
 const app = express();
 app.use(express.json()) // for parsing application/json
 app.use(express.urlencoded({ extended: true })) // for parsing application/x-www-form-urlencoded
-
+app.engine('handlebars', exphbs());
+app.set('view engine', 'handlebars');
 
 app.get('/', (req, res) => {
 	let inputText = req.query.inputText || 'I love you';
@@ -56,7 +58,7 @@ app.get('/slackAuthorize', (req, res) => {
 		params.team = req.query.teamId;
 	}
 
-	res.redirect(`${SLACK_AUTH_URL}?${qs.parse(params)}`);
+	res.redirect(`${SLACK_AUTH_URL}?${qs.stringify(params)}`);
 });
 
 app.get('/slackVerify', (req, res) => {
@@ -68,14 +70,19 @@ app.get('/slackVerify', (req, res) => {
 	
 	let options = {
 		method: 'POST', 
+		headers: { 'content-type': 'application/x-www-form-urlencoded'},
 		uri: SLACK_ACCESS_URL,
-		body: params
+		form: params,
+		//json: true // CWD-- slack doesn't accept json for this endpoint at this time
 	}
+	console.log(`sending over: ${JSON.stringify(params)}`);
 	rp.post(options).then((resp => {
-		console.log(resp.body);
+		const accessResp=JSON.parse(resp);
+		console.log(accessResp);
 		// CWD-- TODO: store token response for the user
+
 		res.status(200);
-		res.send();
+		res.render('postInstall', { title: 'Installation Complete', team_name: accessResp.team_name });
 	})).catch((err) => {
 		console.log(err);
 		res.status(500);
@@ -123,7 +130,7 @@ app.post('/', (req, res) => {
 					user: slackEvent.user,
 					as_user: false
 				},
-				json: true // Automatically stringifies the body to JSON
+				json: true
 			};
 			console.log(options)
 			const resp = rp.post(options).then((resp) => {
