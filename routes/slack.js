@@ -6,10 +6,10 @@ const qs = require('qs');
 const rp = require('request-promise-native');
 const express = require('express');
 const vader = require('vader-sentiment');
-
-const User = require('../models/Users');
+const dbHelper = require('../helpers/dbHelper');
 
 const router = express.Router();
+const User = dbHelper.models.Users;
 
 const THRESHHOLD_NEG = -0.3;
 const THRESHHOLD_POS = 0.3;
