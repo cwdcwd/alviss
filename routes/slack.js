@@ -31,7 +31,7 @@ const SLACK_ACCESS_URL = 'https://slack.com/api/oauth.access';
 
 router.get('/authorize', (req, res) => {
   let params = SLACK_PARAMS_AUTH;
-
+  console.log('authorizing slack');
   if (req.query.teamId) {
     params.team = req.query.teamId;
   }
@@ -40,6 +40,7 @@ router.get('/authorize', (req, res) => {
 });
 
 router.get('/verify', (req, res) => {
+  console.log('verifying slack');
   const params = SLACK_PARAMS_ACCESS;
   if (req.query.code) {
     params.code = req.query.code; // CWD-- should really implement this
@@ -57,12 +58,19 @@ router.get('/verify', (req, res) => {
     const accessResp = JSON.parse(resp);
     console.log(accessResp);
 
-    User.set(_.pick(accessResp, ['access_token', 'scope', 'team_name', 'team_id']));
-    await User.save();
-
     if (_.get(accessResp, 'ok', false) === true) {
-      res.status(200);
-      res.render('postInstall', { title: 'Installation Complete', team_name: accessResp.team_name });
+      User.set(_.pick(accessResp, ['access_token', 'scope', 'team_name', 'team_id']));
+      console.log('saving user');
+      User.save().then((doc) => {
+        console.log('saved user');
+      
+        res.status(200);
+        res.render('postInstall', { title: 'Installation Complete', team_name: accessResp.team_name });
+      }).catch((e) => {
+        console.log(e);
+        res.status(500);
+        res.render('error', { errMsg: e });
+      });
     } else {
       res.status(500);
       res.render('error', { errMsg: accessResp.error });
@@ -103,6 +111,8 @@ router.post('/events', (req, res) => {
       } else if (sentiment.compound < THRESHHOLD_NEG) {
         responseMsg = 'whoa. a little negative there...';
       }
+
+      // TODO: fetch user here
 
       const options = {
         method: 'POST',
