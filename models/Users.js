@@ -1,15 +1,15 @@
 const mongoose = require('mongoose');
 
 const schema = new mongoose.Schema({
+  user_id: { type: String, required: true },
   access_token: { type: String, required: true },
-  scope: { type: String },
   team_name: { type: String, required: true },
-  team_id: { type: String, required: true }
-
+  team_id: { type: String, required: true },
+  scope: { type: String },
+  enterprise_id: { type: String },
 });
 
-// project id, provider, repositoryId must be unique
-//schema.index({ access_token: 1, team_id: 1, repositoryId: 1 }, { unique: true });
+schema.index({ user_id: 1, team_id: 1 }, { unique: true });
 
 module.exports = schema;
 

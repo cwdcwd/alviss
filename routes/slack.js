@@ -9,7 +9,7 @@ const vader = require('vader-sentiment');
 const dbHelper = require('../helpers/dbHelper');
 
 const router = express.Router();
-const User = dbHelper.models.Users;
+const Users = dbHelper.models.Users;
 
 const THRESHHOLD_NEG = -0.3;
 const THRESHHOLD_POS = 0.3;
@@ -59,9 +59,12 @@ router.get('/verify', (req, res) => {
     console.log(accessResp);
 
     if (_.get(accessResp, 'ok', false) === true) {
-      User.set(_.pick(accessResp, ['access_token', 'scope', 'team_name', 'team_id']));
-      console.log('saving user');
-      User.save().then((doc) => {
+      //const user = new Users(_.pick(accessResp, ['access_token', 'scope', 'team_name', 'team_id', 'user_id', 'enterprise_id']));
+      const fields = _.pick(accessResp, ['access_token', 'scope', 'team_name', 'team_id', 'user_id', 'enterprise_id']);
+      const user = dbHelper.upsertUser(fields); 
+      console.log(`saving user: ${JSON.stringify(fields.user_id)}`);
+
+      user.then((doc) => {
         console.log('saved user');
       
         res.status(200);
@@ -112,27 +115,36 @@ router.post('/events', (req, res) => {
         responseMsg = 'whoa. a little negative there...';
       }
 
-      // TODO: fetch user here
+      const user = dbHelper.findUser({user_id: slackEvent.user}); 
+      console.log(user);
 
-      const options = {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${config.SLACK_TOKEN}` },
-        uri: 'https://slack.com/api/chat.postEphemeral',
-        body: {
-          token: slackEvent.token,
-          text: responseMsg,
-          channel: slackEvent.channel,
-          user: slackEvent.user,
-          as_user: false
-        },
-        json: true
-      };
-      console.log(options)
-      const resp = rp.post(options).then((resp) => {
-        console.log(resp);
-        res.status(200);
-        res.send();
-        return;
+      user.then((doc) => {
+        console.log(doc);
+        const options = {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${doc.access_token}` },
+          uri: 'https://slack.com/api/chat.postEphemeral',
+          body: {
+            token: slackEvent.token,
+            text: responseMsg,
+            channel: slackEvent.channel,
+            user: slackEvent.user,
+            as_user: false
+          },
+          json: true
+        };
+        console.log(options)
+        const resp = rp.post(options).then((resp) => {
+          console.log(resp);
+          res.status(200);
+          res.send();
+          return;
+        }).catch((err) => {
+          console.log(err);
+          res.status(500);
+          res.json(err);
+          return;
+        });
       }).catch((err) => {
         console.log(err);
         res.status(500);
