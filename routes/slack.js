@@ -7,6 +7,8 @@ const rp = require('request-promise-native');
 const express = require('express');
 const vader = require('vader-sentiment');
 
+const User = require('../models/Users');
+
 const router = express.Router();
 
 const THRESHHOLD_NEG = -0.3;
@@ -54,7 +56,10 @@ router.get('/verify', (req, res) => {
   rp.post(options).then((resp => {
     const accessResp = JSON.parse(resp);
     console.log(accessResp);
-    // CWD-- TODO: store token response for the user
+
+    User.set(_.pick(accessResp, ['access_token', 'scope', 'team_name', 'team_id']));
+    await User.save();
+
     if (_.get(accessResp, 'ok', false) === true) {
       res.status(200);
       res.render('postInstall', { title: 'Installation Complete', team_name: accessResp.team_name });
