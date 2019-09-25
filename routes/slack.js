@@ -10,6 +10,7 @@ const dbHelper = require('../helpers/dbHelper');
 
 const router = express.Router();
 const Users = dbHelper.models.Users;
+const Sentiments = dbHelper.models.Sentiments;
 
 const THRESHHOLD_NEG = -0.3;
 const THRESHHOLD_POS = 0.3;
@@ -39,7 +40,7 @@ router.get('/authorize', (req, res) => {
   res.redirect(`${SLACK_AUTH_URL}?${qs.stringify(params)}`);
 });
 
-router.get('/verify', (req, res) => {
+router.get('/verify', async (req, res) => {
   console.log('verifying slack');
   const params = SLACK_PARAMS_ACCESS;
   if (req.query.code) {
@@ -59,9 +60,9 @@ router.get('/verify', (req, res) => {
     console.log(accessResp);
 
     if (_.get(accessResp, 'ok', false) === true) {
-      //const user = new Users(_.pick(accessResp, ['access_token', 'scope', 'team_name', 'team_id', 'user_id', 'enterprise_id']));
+
       const fields = _.pick(accessResp, ['access_token', 'scope', 'team_name', 'team_id', 'user_id', 'enterprise_id']);
-      const user = dbHelper.upsertUser(fields); 
+      const user = Users.upsert(fields); 
       console.log(`saving user: ${JSON.stringify(fields.user_id)}`);
 
       user.then((doc) => {
@@ -89,7 +90,7 @@ router.get('/verify', (req, res) => {
 
 });
 
-router.post('/events', (req, res) => {
+router.post('/events', async (req, res) => {
   const body = req.body;
 
   if (body.challenge) {
@@ -108,49 +109,67 @@ router.post('/events', (req, res) => {
       //separate this out to a processor
       const sentiment = vader.SentimentIntensityAnalyzer.polarity_scores(msg);
       let responseMsg = `${JSON.stringify(sentiment)}`;
+      const sentDoc = new Sentiments({ score: sentiment, user_id: slackEvent.user, team_id: slackEvent.team, msg: msg});
+      await sentDoc.save();
 
       if (sentiment.compound > THRESHHOLD_POS) {
         responseMsg = 'Good positive message';
       } else if (sentiment.compound < THRESHHOLD_NEG) {
         responseMsg = 'whoa. a little negative there...';
+      } else {
+        responseMsg = null;
       }
 
-      const user = dbHelper.findUser({user_id: slackEvent.user}); 
-      console.log(user);
+      if (responseMsg) {
+        const user = Users.findOne({ user_id: slackEvent.user });
+        console.log(user);
 
-      user.then((doc) => {
-        console.log(doc);
-        const options = {
-          method: 'POST',
-          headers: { Authorization: `Bearer ${doc.access_token}` },
-          uri: 'https://slack.com/api/chat.postEphemeral',
-          body: {
-            token: slackEvent.token,
-            text: responseMsg,
-            channel: slackEvent.channel,
-            user: slackEvent.user,
-            as_user: false
-          },
-          json: true
-        };
-        console.log(options)
-        const resp = rp.post(options).then((resp) => {
-          console.log(resp);
-          res.status(200);
-          res.send();
-          return;
+        user.then((doc) => {
+          console.log(doc);
+          if (doc) {
+            const options = {
+              method: 'POST',
+              headers: { Authorization: `Bearer ${doc.access_token}` },
+              uri: 'https://slack.com/api/chat.postEphemeral',
+              body: {
+                token: slackEvent.token,
+                text: responseMsg,
+                channel: slackEvent.channel,
+                user: slackEvent.user,
+                as_user: false
+              },
+              json: true
+            };
+            console.log(options)
+            const resp = rp.post(options).then((resp) => {
+              console.log(resp);
+              res.status(200);
+              res.send();
+              return;
+            }).catch((err) => {
+              console.log(err);
+              res.status(500);
+              res.json(err);
+              return;
+            });
+          } else {
+            console.log(`no user found for ${slackEvent.user}`);
+            res.status(500);
+            res.json({ err: `no user found for ${slackEvent.user}` });
+            return;
+          }
         }).catch((err) => {
           console.log(err);
           res.status(500);
           res.json(err);
           return;
         });
-      }).catch((err) => {
-        console.log(err);
-        res.status(500);
-        res.json(err);
+      } else {
+        console.log(`sentiment threshold not extreme enough to respond ${JSON.stringify(sentiment)}`);
+        res.status(200);
+        res.send();
         return;
-      });
+      }
     }
   }
 

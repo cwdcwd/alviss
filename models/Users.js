@@ -11,5 +11,9 @@ const schema = new mongoose.Schema({
 
 schema.index({ user_id: 1, team_id: 1 }, { unique: true });
 
+schema.statics.upsert = function (fields) {
+  return this.findOneAndReplace({ user_id: fields.user_id }, fields, { upsert: true });
+};
+
 module.exports = schema;
 
