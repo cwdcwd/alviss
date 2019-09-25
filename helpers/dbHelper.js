@@ -6,6 +6,7 @@ const connection = mongoose.createConnection(config.MONGODB_URL);
 
 const models = {
   Users: connection.model('Users', require('../models/Users')),
+  Sentiments: connection.model('Users', require('../models/Sentiments'))
 };
 
 const findUser = async (user) => {
