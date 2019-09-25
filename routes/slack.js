@@ -154,8 +154,8 @@ router.post('/events', async (req, res) => {
             });
           } else {
             console.log(`no user found for ${slackEvent.user}`);
-            res.status(500);
-            res.json({ err: `no user found for ${slackEvent.user}` });
+            res.status(200);
+            res.json(); //{ err: `no user found for ${slackEvent.user}` });
             return;
           }
         }).catch((err) => {
