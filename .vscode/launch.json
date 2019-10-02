@@ -7,8 +7,23 @@
         {
             "type": "node",
             "request": "launch",
-            "name": "Launch Program",
+            "name": "Launch Server",
             "program": "${workspaceFolder}/server.js"
+        },
+        {
+            "type": "node",
+            "request": "launch",
+            "name": "Launch Worker",
+            "program": "${workspaceFolder}/worker.js"
+        }
+    ],
+    "compounds": [
+        {
+            "name": "Launch Server/Worker",
+            "configurations": [
+                "Launch Server",
+                "Launch Worker"
+            ]
         }
     ]
 }
